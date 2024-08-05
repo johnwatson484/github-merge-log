@@ -6,31 +6,45 @@ const token = process.env.GITHUB_TOKEN
 
 async function getMerges () {
   const results = []
-  const response = await axios.get(`https://api.github.com/repos/${orgName}/${repoName}/pulls?state=closed&per_page=100`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'X-GitHub-Api-Version': '2022-11-28 ',
-    },
-  })
-  const pulls = response.data
+
+  setAxiosHeaders()
+
+  const pulls = await getPullRequests()
+
   for (const listPullItem of pulls) {
-    const pull = await axios.get(listPullItem.url, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'X-GitHub-Api-Version': '2022-11-28 ',
-      },
-    })
-    const pullMergeData = pull?.data?.merged_by
-    if (pullMergeData) {
+    const pull = await getPullRequest(listPullItem.url)
+    if (pull.merged_by) {
       results.push({
-        pullRequest: pull.data.commits_url,
-        mergedBy: pullMergeData.login,
-        mergedAt: pull.data.merged_at,
+        pullRequest: pull.html_url,
+        mergedBy: pull.merged_by.login,
+        mergedAt: pull.merged_at,
       })
     }
   }
-  results.sort((a, b) => a.mergedAt - b.mergedAt)
+
+  sortResults(results)
+
   console.log(results)
+}
+
+function setAxiosHeaders () {
+  axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
+  axios.defaults.headers.common['X-GitHub-Api-Version'] = '2022-11-28'
+}
+
+async function getPullRequests () {
+  const response = await axios.get(`https://api.github.com/repos/${orgName}/${repoName}/pulls?state=closed&per_page=100`)
+  const data = response.data
+  return data
+}
+
+async function getPullRequest (url) {
+  const response = await axios.get(url)
+  return response.data
+}
+
+function sortResults (results) {
+  results.sort((a, b) => a.mergedAt - b.mergedAt)
 }
 
 getMerges()
